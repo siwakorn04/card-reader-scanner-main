@@ -1,49 +1,39 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-block_cipher = None
 
 a = Analysis(
     ['gui_main.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        ('form_drive.docx', '.'), 
-        ('form_job.docx', '.'), 
-        ('THSarabun.ttf', '.')
-    ],
+    datas=[('form_drive.docx', '.'), ('form_job.docx', '.'), ('THSarabun.ttf', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
+    noarchive=False,
+    optimize=0,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
-    exclude_binaries=True,
-    name='ใบรับรองแพทย์คลินิกชีวาดีบัวใหญ่',
+    name='gui_main',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,              # ❌ ไม่เปิด console window
-    icon='cheewa.ico'           # ✅ ตั้งชื่อไอคอนเป็น cheewa.ico
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
     upx_exclude=[],
-    name='gui_main'
+    runtime_tmpdir=None,
+    console=False,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=['cheewa.ico'],
 )
