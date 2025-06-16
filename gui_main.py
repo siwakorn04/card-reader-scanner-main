@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 from datetime import datetime
 from docx import Document
 from read_card import SmartCard, APDUCommand
@@ -12,7 +12,6 @@ import re
 from docx.shared import Pt
 from docx.oxml.ns import qn
 
-# --- สำหรับ pyinstaller ให้หาไฟล์ภายนอกได้ ---
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -20,10 +19,10 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
-FORM_TEMPLATES = {
+FORM_FILENAMES = {
     "drive": ("ใบรับรองแพทย์ - ขับขี่", "form_drive.docx"),
     "job": ("ใบรับรองแพทย์ - สมัครงาน", "form_job.docx"),
-    "general": ("ใบรับรองแพทย์ - ทั่วไป", "form_general.docx")
+    "general": ("ใบรับรองแพทย์ - ทั่วไป", "form_general.docx"),
 }
 
 def format_thai_date(yyyymmdd):
@@ -40,9 +39,7 @@ def format_thai_date(yyyymmdd):
         return yyyymmdd
 
 def format_cid_boxes(cid):
-    if len(cid) == 13:
-        return " ".join(list(cid))
-    return cid
+    return " ".join(list(cid)) if len(cid) == 13 else cid
 
 def fill_medical_certificate(input_docx, output_docx, data):
     doc = Document(input_docx)
@@ -55,8 +52,7 @@ def fill_medical_certificate(input_docx, output_docx, data):
         parts = re.split(r"(\{\{.*?\}\})", text)
         for part in parts:
             if part.startswith("{{") and part.endswith("}}"): 
-                key = part.strip()
-                val = data.get(key, "")
+                val = data.get(part.strip(), "")
                 run = paragraph.add_run(val)
                 run.bold = True
             else:
@@ -79,9 +75,9 @@ def check_reader_status():
     r = readers()
     return "✅ พบเครื่องอ่านบัตร" if r else "❌ ไม่พบเครื่องอ่านบัตร"
 
-def open_form_screen(form_key):
-    form_name, form_filename = FORM_TEMPLATES[form_key]
-    form_path = resource_path(form_filename)
+def open_form_screen(form_key, branch_name):
+    form_name, form_filename = FORM_FILENAMES[form_key]
+    form_path = resource_path(f"from/{branch_name}/{form_filename}")
 
     def read_and_fill():
         try:
@@ -119,7 +115,6 @@ def open_form_screen(form_key):
             today = datetime.today()
             ref_id = ref_id_entry.get().strip() or "001"
             
-
             data = {
                 "{{คำนำหน้า}}": prefix,
                 "{{ชื่อ}}": th_fullname,
@@ -139,12 +134,13 @@ def open_form_screen(form_key):
                 "{{หนัก}}": weight_entry.get(),
                 "{{สูง}}": height_entry.get(),
                 "{{ความดัน}}": pressure_entry.get(),
-                "{{ชีพจร}}": pulse_entry.get()
+                "{{ชีพจร}}": pulse_entry.get(),
+                "{{สาขา}}": branch_name
             }
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_docx = os.path.join(tmpdir, "temp.docx")
-                tmp_pdf = os.path.join(tmpdir, "temp.pdf")
+                tmp_pdf = os.path.join(tmpdir, f"{branch_name}_{ref_id}.pdf")
 
                 fill_medical_certificate(form_path, tmp_docx, data)
 
@@ -171,7 +167,7 @@ def open_form_screen(form_key):
     form_window.title(form_name)
     form_window.geometry("450x400")
 
-    tk.Label(form_window, text=form_name, font=("TH Sarabun New", 16, "bold")).pack(pady=10)
+    tk.Label(form_window, text=f"{form_name} ({branch_name})", font=("TH Sarabun New", 16, "bold")).pack(pady=10)
 
     frame = tk.Frame(form_window)
     frame.pack(pady=10)
@@ -194,9 +190,8 @@ def open_form_screen(form_key):
 
     tk.Label(form_window, text="เลขที่ใบรับรอง:", font=("TH Sarabun New", 13)).pack()
     ref_id_entry = tk.Entry(form_window)
-    ref_id_entry.insert(0, "001")  # ค่าเริ่มต้นเป็น 001
+    ref_id_entry.insert(0, "001")
     ref_id_entry.pack()
-
 
     tk.Button(form_window, text="✅ อ่านบัตรและกรอกฟอร์ม", font=("TH Sarabun New", 14), command=read_and_fill).pack(pady=20)
 
@@ -207,18 +202,38 @@ def open_form_screen(form_key):
     status_label = tk.Label(form_window, textvariable=status_var, font=("TH Sarabun New", 12), fg=fg_color)
     status_label.pack(pady=5)
 
-# --- GUI หน้าแรก ---
-root = tk.Tk()
-root.title("เลือกประเภทฟอร์มใบรับรองแพทย์")
-root.geometry("400x320")
+def select_branch():
+    def confirm_branch():
+        selected = branch_var.get()
+        branch_win.destroy()
+        show_main(selected)
 
-tk.Label(root, text="คลีนิคชีวาดี สาขาบัวใหญ่", font=("TH Sarabun New", 16)).pack(pady=20)
-tk.Label(root, text="กรุณาเลือกประเภทใบรับรองแพทย์", font=("TH Sarabun New", 16)).pack(pady=20)
+    branch_win = tk.Tk()
+    branch_win.title("เลือกสาขา")
+    branch_win.geometry("300x150")
 
-tk.Button(root, text="🚗 ใบรับรองแพทย์ - ขับขี่", font=("TH Sarabun New", 14), width=30,
-          command=lambda: open_form_screen("drive")).pack(pady=5)
+    tk.Label(branch_win, text="กรุณาเลือกสาขา", font=("TH Sarabun New", 16)).pack(pady=10)
+    branch_var = tk.StringVar(value="บัวใหญ่")
+    ttk.Combobox(branch_win, textvariable=branch_var, values=["บัวใหญ่", "จอหอ"], state="readonly").pack()
+    tk.Button(branch_win, text="ยืนยัน", command=confirm_branch).pack(pady=10)
 
-tk.Button(root, text="💼 ใบรับรองแพทย์ - สมัครงาน", font=("TH Sarabun New", 14), width=30,
-          command=lambda: open_form_screen("job")).pack(pady=5)
+    branch_win.mainloop()
 
-root.mainloop()
+def show_main(branch_name):
+    global root
+    root = tk.Tk()
+    root.title("เลือกประเภทฟอร์มใบรับรองแพทย์")
+    root.geometry("400x320")
+
+    tk.Label(root, text=f"คลินิคชีวาดี สาขา{branch_name}", font=("TH Sarabun New", 16)).pack(pady=20)
+    tk.Label(root, text="กรุณาเลือกประเภทใบรับรองแพทย์", font=("TH Sarabun New", 16)).pack(pady=20)
+
+    tk.Button(root, text="🚗 ใบรับรองแพทย์ - ขับขี่", font=("TH Sarabun New", 14), width=30,
+              command=lambda: open_form_screen("drive", branch_name)).pack(pady=5)
+    tk.Button(root, text="💼 ใบรับรองแพทย์ - สมัครงาน", font=("TH Sarabun New", 14), width=30,
+              command=lambda: open_form_screen("job", branch_name)).pack(pady=5)
+
+    root.mainloop()
+
+if __name__ == "__main__":
+    select_branch()
